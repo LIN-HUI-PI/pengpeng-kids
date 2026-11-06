@@ -55,6 +55,7 @@
   <div id="bar">
     <button class="btn sub" id="sayBtn">🔊 再聽一次</button>
     <button class="btn sub" id="menuBtn">☰ 選玩法</button>
+    <a class="btn sub" href="home.html" style="text-decoration:none">🏠 地圖</a>
   </div>
 
   <div id="overlay">
@@ -65,6 +66,7 @@
     <button class="btn" data-mode="match">👂 聽心情，選顏色</button>
     <button class="btn" data-mode="song">🎵 跟著唱</button>
     <button class="btn" data-mode="compose">🎼 我來作曲</button>
+    <a class="btn sub" href="home.html" style="text-decoration:none;display:inline-block;width:240px;text-align:center">🏠 回關卡地圖</a>
   </div>
 
   <script>
@@ -176,6 +178,12 @@
       } catch (e) {}
     }
 
+    // ---- 闖關進度（存在這支手機裡）----
+    function savePass(n) {
+      try { const c = parseInt(localStorage.getItem("pp_level") || "0", 10); if (n === c + 1) localStorage.setItem("pp_level", String(n)); } catch (e) {}
+    }
+    let tapped = {};
+
     // ---- 共用 ----
     const wordEl = document.getElementById("word");
     const hintEl = document.getElementById("hint");
@@ -220,6 +228,11 @@
         wordEl.innerText = it.color + " · " + it.emo;
         hintEl.innerText = it.zh;
         sayItem(i);
+        tapped[i] = true;
+        if (Object.keys(tapped).length >= 6) {
+          savePass(2);
+          hintEl.innerText = it.zh + "　🎉 6 個顏色都認識了，過關！";
+        }
       } else if (mode === "match") {
         pickMatch(i, el);
       } else if (mode === "song") {
@@ -231,7 +244,7 @@
 
     // ---- 玩法一：自由玩 ----
     function startFree() {
-      mode = "free";
+      mode = "free"; tapped = {};
       showPP(NEUTRAL, "Neutral");
       wordEl.innerText = "點一個顏色！";
       hintEl.innerText = "每個顏色都是一種心情，也是一個音符";
@@ -400,6 +413,7 @@
         hintEl.innerText = "你的歌真好聽！";
         say("Nice song!");
         stars++; starsEl.innerText = "⭐".repeat(stars);
+        if (tune.length >= 4) { savePass(5); hintEl.innerText = "你的歌真好聽！🎉 過關！"; }
         playWin();
         locked = false;
       }, 300 + tune.length * 650 + 200);
@@ -416,6 +430,8 @@
 
     // ---- 選單與結束 ----
     function finish() {
+      if (mode === "match") savePass(3);
+      else if (mode === "song") savePass(4);
       document.getElementById("ovTitle").innerText = "太棒了！Well done!";
       document.getElementById("ovText").innerHTML = "你拿到 " + stars + " 顆星星";
       document.getElementById("bigstars").innerText = "⭐".repeat(stars) || "🌟";
@@ -444,6 +460,13 @@
     document.getElementById("sayBtn").onclick = () => { if (lastSay) say(lastSay); };
 
     showPP(NEUTRAL, "Neutral");
+    (function () {
+      const m = new URLSearchParams(location.search).get("mode");
+      if (m === "free" || m === "match" || m === "song" || m === "compose") {
+        const b = document.querySelector('#overlay [data-mode="' + m + '"]');
+        if (b) b.click();
+      }
+    })();
   </script>
 </body>
 </html>

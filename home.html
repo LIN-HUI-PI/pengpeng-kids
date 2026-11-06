@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>碰碰的英文樂園</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body { background: #fffaf0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #4a3426; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 20px 16px 30px; }
+    h1 { font-size: 1.45rem; color: #c4527a; text-align: center; }
+    p.sub { color: #8a6f5a; margin-bottom: 6px; }
+    img { width: 120px; mix-blend-mode: multiply; margin-bottom: 4px; }
+    #banner { min-height: 1.6rem; font-weight: 800; color: #c4527a; margin-bottom: 4px; text-align: center; }
+    #map { width: 100%; max-width: 330px; display: flex; flex-direction: column; align-items: center; }
+    .path { width: 6px; height: 16px; background: repeating-linear-gradient(#e7c6d3 0 6px, transparent 6px 10px); border-radius: 3px; }
+    a.lv { display: flex; align-items: center; gap: 12px; width: 100%; text-decoration: none; color: #fff; padding: 12px 16px; border-radius: 24px; box-shadow: 0 3px 8px rgba(0,0,0,.2); }
+    .num { width: 42px; height: 42px; border-radius: 50%; background: rgba(255,255,255,.95); color: #c4527a; font-weight: 800; font-size: 1.3rem; display: flex; align-items: center; justify-content: center; flex: none; }
+    .tx { flex: 1; font-weight: 800; font-size: 1.1rem; }
+    .tx small { display: block; font-weight: 500; font-size: .85rem; opacity: .95; }
+    .st { font-size: 1.5rem; flex: none; }
+    a.lv.c1 { background: #d9739a; } a.lv.c2 { background: #f5b82e; } a.lv.c3 { background: #5b9be0; }
+    a.lv.c4 { background: #4caf62; } a.lv.c5 { background: #f28c28; }
+    a.lv.locked { background: #cfc4bb; box-shadow: none; }
+    a.lv.locked .num { color: #a89b91; }
+    a.lv.shake { animation: shake .4s; }
+    @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+    #parent { margin-top: 22px; font-size: .8rem; color: #b5a89d; text-align: center; }
+    #parent span { text-decoration: underline; padding: 6px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>碰碰的英文樂園</h1>
+  <p class="sub">Pengpeng's English Park</p>
+  <img src="pengpeng.png" alt="碰碰">
+  <div id="banner"></div>
+  <div id="map"></div>
+  <div id="parent">家長：<span id="unlockAll">全部解鎖</span>｜<span id="resetAll">重新開始</span></div>
+
+  <script>
+    const LEVELS = [
+      { n: "心情 Feelings",        d: "Happy・Excited・Angry・Sad", href: "index.html" },
+      { n: "認識顏色 Colors",       d: "點 6 個顏色，認識心情",       href: "colors.html?mode=free" },
+      { n: "顏色配對 Match",        d: "聽心情，選對顏色",             href: "colors.html?mode=match" },
+      { n: "跟著唱 Sing Along",     d: "記住顏色的順序",               href: "colors.html?mode=song" },
+      { n: "我來作曲 Compose",      d: "排顏色，讓碰碰唱你的歌",       href: "colors.html?mode=compose" }
+    ];
+    function getLevel() { try { return parseInt(localStorage.getItem("pp_level") || "0", 10) || 0; } catch (e) { return 0; } }
+    function setLevel(n) { try { localStorage.setItem("pp_level", String(n)); } catch (e) {} }
+
+    function render() {
+      const passed = getLevel();
+      const map = document.getElementById("map");
+      map.innerHTML = "";
+      LEVELS.forEach((lv, k) => {
+        const no = k + 1;
+        const open = no <= passed + 1;
+        const done = no <= passed;
+        if (k > 0) { const p = document.createElement("div"); p.className = "path"; map.appendChild(p); }
+        const a = document.createElement("a");
+        a.className = "lv c" + no + (open ? "" : " locked");
+        a.href = open ? lv.href : "#";
+        a.innerHTML = '<div class="num">' + no + '</div><div class="tx">' + lv.n + '<small>' + lv.d + '</small></div><div class="st">' + (done ? "⭐" : open ? "▶" : "🔒") + '</div>';
+        if (!open) a.onclick = (ev) => { ev.preventDefault(); a.classList.add("shake"); setTimeout(() => a.classList.remove("shake"), 450); document.getElementById("banner").innerText = "先過上一關，才能玩這關喔！"; };
+        map.appendChild(a);
+      });
+      document.getElementById("banner").innerText = passed >= LEVELS.length ? "🎉 全部過關！碰碰最棒！" : "過關後會解鎖下一關";
+    }
+    document.getElementById("unlockAll").onclick = () => { setLevel(LEVELS.length); render(); };
+    document.getElementById("resetAll").onclick = () => { if (confirm("要把闖關進度清掉重新開始嗎？")) { setLevel(0); render(); } };
+    render();
+  </script>
+</body>
+</html>
