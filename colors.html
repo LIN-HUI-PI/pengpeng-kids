@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>碰碰的彩色音符 Color Notes</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+    body { background: #fffaf0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #4a3426; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 14px 14px 24px; }
+    h1 { font-size: 1.15rem; color: #c4527a; margin-bottom: 2px; }
+    #stars { font-size: 1.3rem; min-height: 1.8rem; letter-spacing: 4px; }
+    #stage { position: relative; width: 190px; height: 210px; margin: 2px auto 0; }
+    #pp { width: 100%; height: 100%; background-image: url(pengpeng_colors.png); background-size: 700% 100%; background-repeat: no-repeat; mix-blend-mode: multiply; }
+    #face { position: absolute; inset: 0; width: 100%; height: 100%; }
+    #word { font-size: 2.2rem; font-weight: 800; letter-spacing: 2px; margin: 4px 0 0; min-height: 3rem; text-align: center; }
+    #hint { font-size: 0.95rem; color: #8a6f5a; min-height: 1.4rem; margin-bottom: 8px; text-align: center; }
+    #swatches { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: 100%; max-width: 340px; }
+    .sw { aspect-ratio: 1; border-radius: 50%; border: 5px solid #fff; box-shadow: 0 3px 8px rgba(0,0,0,.25); cursor: pointer; transition: transform .1s; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.5); font-size: 1.05rem; }
+    .sw:active { transform: scale(0.92); }
+    .sw.lit { transform: scale(1.12); box-shadow: 0 0 0 6px rgba(255,255,255,.9), 0 0 18px 6px rgba(255,200,80,.9); }
+    .shake { animation: shake .4s; }
+    .good { box-shadow: 0 0 0 6px #6cc070; }
+    @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+    .btn { margin-top: 12px; background: #d9739a; color: #fff; border: none; font-weight: bold; font-size: 1.02rem; padding: 11px 26px; border-radius: 28px; cursor: pointer; }
+    .btn.sub { background: #fff; color: #c4527a; border: 3px solid #d9739a; }
+    #tune { display: none; flex-wrap: wrap; gap: 6px; justify-content: center; min-height: 36px; margin: 8px 0 0; max-width: 340px; }
+    .dot { width: 28px; height: 28px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 2px 4px rgba(0,0,0,.3); }
+    .dot.on { transform: scale(1.3); box-shadow: 0 0 0 4px rgba(255,200,80,.9); }
+    #composeBar { display: none; gap: 10px; }
+    #bar { display: flex; gap: 10px; }
+    #overlay { position: fixed; inset: 0; background: rgba(255,250,240,0.98); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; z-index: 10; }
+    #overlay h2 { font-size: 1.5rem; color: #c4527a; margin-bottom: 6px; }
+    #overlay p { font-size: 1rem; line-height: 1.6; margin-bottom: 10px; }
+    #overlay .btn { width: 240px; margin-top: 10px; }
+    #bigstars { font-size: 2.2rem; letter-spacing: 6px; margin: 6px 0; }
+  </style>
+</head>
+<body>
+  <h1>碰碰的彩色音符 Color Notes</h1>
+  <div id="stars"></div>
+
+  <div id="stage">
+    <div id="pp"></div>
+    <svg id="face" viewBox="0 0 420 464"></svg>
+  </div>
+
+  <div id="word"></div>
+  <div id="hint"></div>
+  <div id="swatches"></div>
+  <div id="tune"></div>
+  <div id="composeBar">
+    <button class="btn" id="playTune">▶ 唱出來</button>
+    <button class="btn sub" id="clearTune">🗑 重來</button>
+  </div>
+  <div id="bar">
+    <button class="btn sub" id="sayBtn">🔊 再聽一次</button>
+    <button class="btn sub" id="menuBtn">☰ 選玩法</button>
+  </div>
+
+  <div id="overlay">
+    <h2 id="ovTitle">碰碰的彩色音符</h2>
+    <p id="ovText">每種顏色都是一種心情，<br>也是一個音符！</p>
+    <div id="bigstars"></div>
+    <button class="btn" data-mode="free">🎨 自由玩（點顏色）</button>
+    <button class="btn" data-mode="match">👂 聽心情，選顏色</button>
+    <button class="btn" data-mode="song">🎵 跟著唱</button>
+    <button class="btn" data-mode="compose">🎼 我來作曲</button>
+  </div>
+
+  <script>
+    // 順序 = 圖片裡 碰碰 的顏色順序：黃、藍、紅、綠、粉紅、橘、灰(空白)
+    const ITEMS = [
+      { emo: "Happy",   color: "Yellow", hex: "#f5d33f", zh: "開心", note: 329.6 },
+      { emo: "Sad",     color: "Blue",   hex: "#5b9be0", zh: "難過", note: 440.0 },
+      { emo: "Angry",   color: "Red",    hex: "#e0463c", zh: "生氣", note: 261.6 },
+      { emo: "Calm",    color: "Green",  hex: "#4caf62", zh: "平靜", note: 392.0 },
+      { emo: "Love",    color: "Pink",   hex: "#f58fb5", zh: "喜愛", note: 523.3 },
+      { emo: "Excited", color: "Orange", hex: "#f28c28", zh: "興奮", note: 293.7 }
+    ];
+    const NEUTRAL = 6;
+
+    const INK = "#0b0b06", EYE = "#fffff0";
+    const L = { x: 114, y: 188 }, R = { x: 267, y: 177 };
+    const MX = 202, MY = 328;
+
+    function eye(c, r, px, py, pr) {
+      return '<circle cx="' + c.x + '" cy="' + c.y + '" r="' + r + '" fill="' + EYE + '" stroke="' + INK + '" stroke-width="7"/>' +
+             '<circle cx="' + (c.x + px) + '" cy="' + (c.y + py) + '" r="' + pr + '" fill="' + INK + '"/>';
+    }
+    function line(x1, y1, x2, y2, w) {
+      return '<path d="M' + x1 + ' ' + y1 + ' L' + x2 + ' ' + y2 + '" stroke="' + INK + '" stroke-width="' + w + '" stroke-linecap="round" fill="none"/>';
+    }
+    function curve(d, w) {
+      return '<path d="' + d + '" stroke="' + INK + '" stroke-width="' + w + '" stroke-linecap="round" fill="none"/>';
+    }
+    function heart(cx, cy, s) {
+      return '<path d="M' + cx + ' ' + (cy + s * 0.9) + ' C' + (cx - s * 1.5) + ' ' + (cy - s * 0.1) + ' ' + (cx - s * 0.7) + ' ' + (cy - s * 1.2) + ' ' + cx + ' ' + (cy - s * 0.35) +
+             ' C' + (cx + s * 0.7) + ' ' + (cy - s * 1.2) + ' ' + (cx + s * 1.5) + ' ' + (cy - s * 0.1) + ' ' + cx + ' ' + (cy + s * 0.9) + ' Z" fill="#e0245e" stroke="' + INK + '" stroke-width="4" stroke-linejoin="round"/>';
+    }
+
+    function features(emo) {
+      let s = "";
+      const blush = '<ellipse cx="60" cy="262" rx="22" ry="13" fill="#ffffff" opacity=".35"/><ellipse cx="335" cy="250" rx="22" ry="13" fill="#ffffff" opacity=".35"/>';
+      if (emo === "Happy") {
+        s += curve("M" + (L.x - 28) + " " + (L.y + 8) + " Q" + L.x + " " + (L.y - 30) + " " + (L.x + 28) + " " + (L.y + 8), 8);
+        s += curve("M" + (R.x - 28) + " " + (R.y + 8) + " Q" + R.x + " " + (R.y - 30) + " " + (R.x + 28) + " " + (R.y + 8), 8);
+        s += curve("M" + (MX - 48) + " " + (MY - 12) + " Q" + MX + " " + (MY + 52) + " " + (MX + 48) + " " + (MY - 12), 8);
+        s += blush;
+      } else if (emo === "Excited") {
+        s += eye(L, 38, 0, -4, 9) + eye(R, 38, 0, -4, 9);
+        s += '<circle cx="' + (L.x + 4) + '" cy="' + (L.y - 9) + '" r="3.5" fill="#fff"/><circle cx="' + (R.x + 4) + '" cy="' + (R.y - 9) + '" r="3.5" fill="#fff"/>';
+        s += '<path d="M' + (MX - 46) + ' ' + (MY - 14) + ' Q' + MX + ' ' + (MY - 6) + ' ' + (MX + 46) + ' ' + (MY - 14) + ' Q' + MX + ' ' + (MY + 66) + ' ' + (MX - 46) + ' ' + (MY - 14) + ' Z" fill="#a8334a" stroke="' + INK + '" stroke-width="7" stroke-linejoin="round"/>';
+        s += blush;
+      } else if (emo === "Angry") {
+        s += eye(L, 31, 4, 6, 8) + eye(R, 31, -4, 6, 8);
+        s += line(L.x - 40, L.y - 50, L.x + 34, L.y - 20, 12);
+        s += line(R.x + 40, R.y - 50, R.x - 34, R.y - 20, 12);
+        s += curve("M" + (MX - 40) + " " + (MY + 22) + " Q" + MX + " " + (MY - 14) + " " + (MX + 40) + " " + (MY + 22), 8);
+      } else if (emo === "Sad") {
+        s += eye(L, 31, 0, 10, 8) + eye(R, 31, 0, 10, 8);
+        s += line(L.x - 36, L.y - 28, L.x + 30, L.y - 50, 8);
+        s += line(R.x + 36, R.y - 28, R.x - 30, R.y - 50, 8);
+        s += '<path d="M' + (L.x - 8) + ' ' + (L.y + 40) + ' Q' + (L.x - 24) + ' ' + (L.y + 70) + ' ' + (L.x - 8) + ' ' + (L.y + 84) + ' Q' + (L.x + 12) + ' ' + (L.y + 70) + ' ' + (L.x - 8) + ' ' + (L.y + 40) + ' Z" fill="#bfe3ff" stroke="#2f6fb0" stroke-width="3"/>';
+        s += curve("M" + (MX - 38) + " " + (MY + 20) + " Q" + MX + " " + (MY - 16) + " " + (MX + 38) + " " + (MY + 20), 8);
+      } else if (emo === "Calm") {
+        // 閉眼微笑
+        s += curve("M" + (L.x - 28) + " " + (L.y - 2) + " Q" + L.x + " " + (L.y + 22) + " " + (L.x + 28) + " " + (L.y - 2), 8);
+        s += curve("M" + (R.x - 28) + " " + (R.y - 2) + " Q" + R.x + " " + (R.y + 22) + " " + (R.x + 28) + " " + (R.y - 2), 8);
+        s += curve("M" + (MX - 26) + " " + (MY) + " Q" + MX + " " + (MY + 16) + " " + (MX + 26) + " " + (MY), 7);
+      } else if (emo === "Love") {
+        s += heart(L.x, L.y, 24) + heart(R.x, R.y, 24);
+        s += curve("M" + (MX - 40) + " " + (MY - 10) + " Q" + MX + " " + (MY + 42) + " " + (MX + 40) + " " + (MY - 10), 8);
+        s += blush;
+      } else {
+        // 空白心情
+        s += eye(L, 31, 0, 0, 8) + eye(R, 31, 0, 0, 8);
+        s += curve("M" + (MX - 28) + " " + MY + " L" + (MX + 28) + " " + MY, 7);
+      }
+      return s;
+    }
+
+    // ---- 碰碰顯示 ----
+    const ppEl = document.getElementById("pp");
+    const faceEl = document.getElementById("face");
+    function showPP(spriteIdx, emo) {
+      ppEl.style.backgroundPosition = (spriteIdx / 6 * 100) + "% 0";
+      faceEl.innerHTML = features(emo);
+    }
+
+    // ---- 聲音 ----
+    let audioCtx = null;
+    function tone(freq, start, dur, type, vol) {
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const o = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        o.type = type || "triangle";
+        o.frequency.value = freq;
+        const t0 = audioCtx.currentTime + (start || 0);
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.exponentialRampToValueAtTime(vol || 0.3, t0 + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+        o.connect(g); g.connect(audioCtx.destination);
+        o.start(t0); o.stop(t0 + dur + 0.05);
+      } catch (e) {}
+    }
+    function playBad() { tone(220, 0, 0.18, "sine"); tone(196, 0.16, 0.25, "sine"); }
+    function playWin() { [523, 659, 784, 659, 784, 1047, 1319].forEach((f, i) => tone(f, i * 0.14, 0.3)); }
+    function say(text) {
+      try {
+        if (!window.speechSynthesis) return;
+        speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = "en-US"; u.rate = 0.8; u.pitch = 1.1;
+        speechSynthesis.speak(u);
+      } catch (e) {}
+    }
+
+    // ---- 共用 ----
+    const wordEl = document.getElementById("word");
+    const hintEl = document.getElementById("hint");
+    const swEl = document.getElementById("swatches");
+    const starsEl = document.getElementById("stars");
+    const overlay = document.getElementById("overlay");
+    let mode = "", stars = 0, locked = false, lastSay = "";
+    let order = [], idx = 0, mistakes = 0;
+    let seq = [], seqPos = 0, seqLen = 2, seqRound = 0, listening = false;
+
+    function shuffle(a) {
+      a = a.slice();
+      for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+      return a;
+    }
+
+    function drawSwatches(list, withNames) {
+      swEl.innerHTML = "";
+      list.forEach(i => {
+        const it = ITEMS[i];
+        const d = document.createElement("div");
+        d.className = "sw";
+        d.style.background = it.hex;
+        d.dataset.i = i;
+        if (withNames) d.innerText = it.color;
+        d.onclick = () => onSwatch(i, d);
+        swEl.appendChild(d);
+      });
+    }
+
+    function sayItem(i) {
+      const it = ITEMS[i];
+      lastSay = it.color + ". " + it.emo + ".";
+      say(lastSay);
+    }
+
+    function onSwatch(i, el) {
+      if (mode === "free") {
+        const it = ITEMS[i];
+        showPP(i, it.emo);
+        tone(it.note, 0, 0.5);
+        wordEl.innerText = it.color + " · " + it.emo;
+        hintEl.innerText = it.zh;
+        sayItem(i);
+      } else if (mode === "match") {
+        pickMatch(i, el);
+      } else if (mode === "song") {
+        pickSong(i, el);
+      } else if (mode === "compose") {
+        pickCompose(i);
+      }
+    }
+
+    // ---- 玩法一：自由玩 ----
+    function startFree() {
+      mode = "free";
+      showPP(NEUTRAL, "Neutral");
+      wordEl.innerText = "點一個顏色！";
+      hintEl.innerText = "每個顏色都是一種心情，也是一個音符";
+      drawSwatches([0, 1, 2, 3, 4, 5], true);
+    }
+
+    // ---- 玩法二：聽心情，選顏色 ----
+    function startMatch() {
+      mode = "match"; stars = 0; idx = 0;
+      starsEl.innerText = "";
+      order = shuffle([0, 1, 2, 3, 4, 5]);
+      matchRound();
+    }
+    function matchRound() {
+      locked = false; mistakes = 0;
+      const t = order[idx];
+      const it = ITEMS[t];
+      showPP(NEUTRAL, it.emo);
+      wordEl.innerText = it.emo;
+      hintEl.innerText = "碰碰現在的心情是什麼顏色？";
+      const others = shuffle([0, 1, 2, 3, 4, 5].filter(x => x !== t)).slice(0, 2);
+      drawSwatches(shuffle([t].concat(others)), false);
+      lastSay = it.emo;
+      say(lastSay);
+    }
+    function pickMatch(i, el) {
+      if (locked) return;
+      const t = order[idx];
+      const it = ITEMS[t];
+      if (i === t) {
+        locked = true;
+        el.classList.add("good");
+        showPP(t, it.emo);
+        [0, 1, 2].forEach(k => tone(it.note * (k === 2 ? 2 : 1), k * 0.12, 0.3));
+        hintEl.innerText = "答對了！" + it.color + " = " + it.emo + "（" + it.zh + "）";
+        if (mistakes === 0) stars++;
+        starsEl.innerText = "⭐".repeat(stars);
+        say("Great! " + it.color + ". " + it.emo);
+        setTimeout(() => { idx++; if (idx >= order.length) finish(); else matchRound(); }, 2000);
+      } else {
+        mistakes++;
+        el.classList.add("shake");
+        setTimeout(() => el.classList.remove("shake"), 450);
+        hintEl.innerText = "再試一次！";
+        playBad();
+      }
+    }
+
+    // ---- 玩法三：跟著唱 ----
+    function startSong() {
+      mode = "song"; stars = 0; seqRound = 0; seqLen = 2;
+      starsEl.innerText = "";
+      drawSwatches([0, 1, 2, 3, 4, 5], true);
+      newSeq();
+    }
+    function newSeq() {
+      seq = [];
+      for (let k = 0; k < seqLen; k++) seq.push(Math.floor(Math.random() * 6));
+      seqPos = 0; listening = false;
+      showPP(NEUTRAL, "Neutral");
+      wordEl.innerText = "聽聽看…";
+      hintEl.innerText = "碰碰先唱一遍";
+      lockInput(true);
+      let t = 600;
+      seq.forEach((i, k) => {
+        setTimeout(() => flash(i, true), t + k * 800);
+      });
+      setTimeout(() => {
+        listening = true; lockInput(false);
+        showPP(NEUTRAL, "Happy");
+        wordEl.innerText = "換你唱！";
+        hintEl.innerText = "照剛剛的順序點顏色（共 " + seq.length + " 個）";
+      }, t + seq.length * 800 + 200);
+    }
+    function lockInput(v) { locked = v; }
+    function flash(i, speak) {
+      const it = ITEMS[i];
+      const el = swEl.querySelector('[data-i="' + i + '"]');
+      if (el) { el.classList.add("lit"); setTimeout(() => el.classList.remove("lit"), 500); }
+      showPP(i, it.emo);
+      tone(it.note, 0, 0.55);
+      if (speak) wordEl.innerText = it.color;
+    }
+    function pickSong(i, el) {
+      if (locked || !listening) return;
+      flash(i, false);
+      if (i === seq[seqPos]) {
+        seqPos++;
+        wordEl.innerText = ITEMS[i].color;
+        if (seqPos >= seq.length) {
+          listening = false; locked = true;
+          stars++; starsEl.innerText = "⭐".repeat(stars);
+          hintEl.innerText = "唱得真好！";
+          say("Great!");
+          setTimeout(() => {
+            seqRound++;
+            if (seqRound >= 4) { finish(); return; }
+            seqLen++; newSeq();
+          }, 1500);
+        }
+      } else {
+        playBad();
+        el.classList.add("shake");
+        setTimeout(() => el.classList.remove("shake"), 450);
+        hintEl.innerText = "再聽一遍！";
+        listening = false; locked = true;
+        setTimeout(() => { seqPos = 0; replaySeq(); }, 900);
+      }
+    }
+    function replaySeq() {
+      showPP(NEUTRAL, "Neutral");
+      wordEl.innerText = "聽聽看…";
+      let t = 300;
+      seq.forEach((i, k) => setTimeout(() => flash(i, true), t + k * 800));
+      setTimeout(() => {
+        listening = true; locked = false;
+        showPP(NEUTRAL, "Happy");
+        wordEl.innerText = "換你唱！";
+        hintEl.innerText = "照剛剛的順序點顏色（共 " + seq.length + " 個）";
+      }, t + seq.length * 800 + 200);
+    }
+
+    // ---- 玩法四：我來作曲 ----
+    let tune = [];
+    const MAXN = 8;
+    function renderTune(active) {
+      const t = document.getElementById("tune");
+      t.innerHTML = "";
+      tune.forEach((i, k) => {
+        const d = document.createElement("div");
+        d.className = "dot" + (k === active ? " on" : "");
+        d.style.background = ITEMS[i].hex;
+        t.appendChild(d);
+      });
+    }
+    function startCompose() {
+      mode = "compose"; tune = []; locked = false; stars = 0;
+      starsEl.innerText = "";
+      showPP(NEUTRAL, "Neutral");
+      wordEl.innerText = "我來作曲！";
+      hintEl.innerText = "按顏色排出小旋律（最多 " + MAXN + " 個）";
+      drawSwatches([0, 1, 2, 3, 4, 5], true);
+      document.getElementById("tune").style.display = "flex";
+      document.getElementById("composeBar").style.display = "flex";
+      renderTune(-1);
+    }
+    function pickCompose(i) {
+      if (locked) return;
+      if (tune.length >= MAXN) { hintEl.innerText = "滿了！按「唱出來」"; return; }
+      tune.push(i);
+      renderTune(-1);
+      flash(i, true);
+      hintEl.innerText = "已經 " + tune.length + " 個音符";
+    }
+    function playTune() {
+      if (locked || mode !== "compose") return;
+      if (tune.length < 2) { hintEl.innerText = "至少排 2 個顏色喔"; return; }
+      locked = true;
+      tune.forEach((i, k) => {
+        setTimeout(() => { renderTune(k); flash(i, true); }, 300 + k * 650);
+      });
+      setTimeout(() => {
+        renderTune(-1);
+        showPP(4, "Love");
+        wordEl.innerText = "Nice song!";
+        hintEl.innerText = "你的歌真好聽！";
+        say("Nice song!");
+        stars++; starsEl.innerText = "⭐".repeat(stars);
+        playWin();
+        locked = false;
+      }, 300 + tune.length * 650 + 200);
+    }
+    function clearTune() {
+      if (locked) return;
+      tune = []; renderTune(-1);
+      showPP(NEUTRAL, "Neutral");
+      wordEl.innerText = "我來作曲！";
+      hintEl.innerText = "按顏色排出小旋律（最多 " + MAXN + " 個）";
+    }
+    document.getElementById("playTune").onclick = playTune;
+    document.getElementById("clearTune").onclick = clearTune;
+
+    // ---- 選單與結束 ----
+    function finish() {
+      document.getElementById("ovTitle").innerText = "太棒了！Well done!";
+      document.getElementById("ovText").innerHTML = "你拿到 " + stars + " 顆星星";
+      document.getElementById("bigstars").innerText = "⭐".repeat(stars) || "🌟";
+      overlay.style.display = "flex";
+      playWin();
+    }
+    document.querySelectorAll("#overlay [data-mode]").forEach(b => {
+      b.onclick = () => {
+        overlay.style.display = "none";
+        document.getElementById("bigstars").innerText = "";
+        starsEl.innerText = "";
+        document.getElementById("tune").style.display = "none";
+        document.getElementById("composeBar").style.display = "none";
+        if (b.dataset.mode === "free") startFree();
+        else if (b.dataset.mode === "compose") startCompose();
+        else if (b.dataset.mode === "match") startMatch();
+        else startSong();
+      };
+    });
+    document.getElementById("menuBtn").onclick = () => {
+      document.getElementById("ovTitle").innerText = "碰碰的彩色音符";
+      document.getElementById("ovText").innerHTML = "每種顏色都是一種心情，<br>也是一個音符！";
+      document.getElementById("bigstars").innerText = "";
+      overlay.style.display = "flex";
+    };
+    document.getElementById("sayBtn").onclick = () => { if (lastSay) say(lastSay); };
+
+    showPP(NEUTRAL, "Neutral");
+  </script>
+</body>
+</html>
