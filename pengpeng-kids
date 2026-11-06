@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>碰碰的表情 Feelings with 碰碰</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+    body { background: #fffaf0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #4a3426; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 16px 14px 24px; }
+    h1 { font-size: 1.2rem; color: #c4527a; margin-bottom: 4px; }
+    #stars { font-size: 1.4rem; min-height: 2rem; letter-spacing: 4px; }
+    #stage { position: relative; width: 210px; margin: 4px auto 0; }
+    #pp { width: 100%; display: block; mix-blend-mode: multiply; }
+    #face { position: absolute; inset: 0; width: 100%; height: 100%; }
+    #word { font-size: 2.6rem; font-weight: 800; letter-spacing: 2px; margin: 6px 0 2px; }
+    #hint { font-size: 0.95rem; color: #8a6f5a; min-height: 1.4rem; margin-bottom: 10px; }
+    #choices { display: flex; gap: 12px; justify-content: center; width: 100%; max-width: 380px; }
+    .choice { flex: 1; background: #fff; border: 4px solid #e8c9d4; border-radius: 20px; padding: 6px; cursor: pointer; transition: transform .1s; }
+    .choice:active { transform: scale(0.95); }
+    .choice svg { width: 100%; display: block; }
+    .shake { animation: shake .4s; border-color: #e8a0a0 !important; }
+    .good { border-color: #6cc070 !important; background: #f2fff0; }
+    @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+    .btn { margin-top: 14px; background: #d9739a; color: #fff; border: none; font-weight: bold; font-size: 1.05rem; padding: 12px 28px; border-radius: 28px; cursor: pointer; }
+    .btn.sub { background: #fff; color: #c4527a; border: 3px solid #d9739a; }
+    #overlay { position: fixed; inset: 0; background: rgba(255,250,240,0.97); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; z-index: 10; }
+    #overlay h2 { font-size: 1.6rem; color: #c4527a; margin-bottom: 8px; }
+    #overlay p { font-size: 1rem; line-height: 1.6; margin-bottom: 8px; }
+    #bigstars { font-size: 2.4rem; letter-spacing: 6px; margin: 8px 0; }
+  </style>
+</head>
+<body>
+  <h1>碰碰的表情 Feelings with 碰碰</h1>
+  <div id="stars"></div>
+
+  <div id="stage">
+    <img id="pp" src="pengpeng.png" alt="">
+    <svg id="face" viewBox="0 0 420 464"></svg>
+  </div>
+
+  <div id="word"></div>
+  <div id="hint"></div>
+  <div id="choices"></div>
+  <button class="btn sub" id="sayBtn">🔊 再聽一次</button>
+
+  <div id="overlay">
+    <h2 id="ovTitle">幫碰碰換表情！</h2>
+    <p id="ovText">聽聽看、看看單字，<br>幫碰碰選出對的表情吧！</p>
+    <div id="bigstars"></div>
+    <button class="btn" id="startBtn">開始玩 Start</button>
+  </div>
+
+  <script>
+    // ---- 表情設定（座標對應 pengpeng.png 的 420x464 畫面）----
+    const EMOS = ["Happy", "Excited", "Angry", "Sad"];
+    const HINT = { Happy: "開心", Excited: "興奮", Angry: "生氣", Sad: "難過" };
+    const BODY = "#d18298";
+    const INK = "#0b0b06";
+    const EYE = "#fffff0";
+    const L = { x: 114, y: 188 };   // 左眼中心
+    const R = { x: 267, y: 177 };   // 右眼中心
+    const MX = 202, MY = 328;       // 嘴巴中心
+
+    function eye(c, r, px, py, pr) {
+      return '<circle cx="' + c.x + '" cy="' + c.y + '" r="' + r + '" fill="' + EYE + '" stroke="' + INK + '" stroke-width="7"/>' +
+             '<circle cx="' + (c.x + px) + '" cy="' + (c.y + py) + '" r="' + pr + '" fill="' + INK + '"/>';
+    }
+    function line(x1, y1, x2, y2, w) {
+      return '<path d="M' + x1 + ' ' + y1 + ' L' + x2 + ' ' + y2 + '" stroke="' + INK + '" stroke-width="' + w + '" stroke-linecap="round" fill="none"/>';
+    }
+    function curve(d, w) {
+      return '<path d="' + d + '" stroke="' + INK + '" stroke-width="' + w + '" stroke-linecap="round" fill="none"/>';
+    }
+
+    function features(emo) {
+      let s = "";
+      const blush = '<ellipse cx="60" cy="262" rx="22" ry="13" fill="#e9a0b4" opacity=".7"/><ellipse cx="335" cy="250" rx="22" ry="13" fill="#e9a0b4" opacity=".7"/>';
+      if (emo === "Happy") {
+        // 彎彎笑眼
+        s += curve("M" + (L.x - 28) + " " + (L.y + 8) + " Q" + L.x + " " + (L.y - 30) + " " + (L.x + 28) + " " + (L.y + 8), 8);
+        s += curve("M" + (R.x - 28) + " " + (R.y + 8) + " Q" + R.x + " " + (R.y - 30) + " " + (R.x + 28) + " " + (R.y + 8), 8);
+        s += curve("M" + (MX - 48) + " " + (MY - 12) + " Q" + MX + " " + (MY + 52) + " " + (MX + 48) + " " + (MY - 12), 8);
+        s += blush;
+      } else if (emo === "Excited") {
+        s += eye(L, 38, 0, -4, 9) + eye(R, 38, 0, -4, 9);
+        s += '<circle cx="' + (L.x + 4) + '" cy="' + (L.y - 9) + '" r="3.5" fill="#fff"/><circle cx="' + (R.x + 4) + '" cy="' + (R.y - 9) + '" r="3.5" fill="#fff"/>';
+        s += '<path d="M' + (MX - 46) + ' ' + (MY - 14) + ' Q' + MX + ' ' + (MY - 6) + ' ' + (MX + 46) + ' ' + (MY - 14) + ' Q' + MX + ' ' + (MY + 66) + ' ' + (MX - 46) + ' ' + (MY - 14) + ' Z" fill="#a8334a" stroke="' + INK + '" stroke-width="7" stroke-linejoin="round"/>';
+        s += '<path d="M' + (MX - 24) + ' ' + (MY + 30) + ' Q' + MX + ' ' + (MY + 14) + ' ' + (MX + 24) + ' ' + (MY + 30) + ' Q' + MX + ' ' + (MY + 46) + ' ' + (MX - 24) + ' ' + (MY + 30) + ' Z" fill="#ef8da0"/>';
+        s += blush;
+      } else if (emo === "Angry") {
+        s += eye(L, 31, 4, 6, 8) + eye(R, 31, -4, 6, 8);
+        // 粗眉毛往中間下壓
+        s += line(L.x - 40, L.y - 50, L.x + 34, L.y - 20, 12);
+        s += line(R.x + 40, R.y - 50, R.x - 34, R.y - 20, 12);
+        s += curve("M" + (MX - 40) + " " + (MY + 22) + " Q" + MX + " " + (MY - 14) + " " + (MX + 40) + " " + (MY + 22), 8);
+        s += '<ellipse cx="60" cy="262" rx="22" ry="13" fill="#d9534f" opacity=".5"/><ellipse cx="335" cy="250" rx="22" ry="13" fill="#d9534f" opacity=".5"/>';
+      } else if (emo === "Sad") {
+        s += eye(L, 31, 0, 10, 8) + eye(R, 31, 0, 10, 8);
+        s += line(L.x - 36, L.y - 28, L.x + 30, L.y - 50, 8);
+        s += line(R.x + 36, R.y - 28, R.x - 30, R.y - 50, 8);
+        s += '<path d="M' + (L.x - 8) + ' ' + (L.y + 40) + ' Q' + (L.x - 24) + ' ' + (L.y + 70) + ' ' + (L.x - 8) + ' ' + (L.y + 84) + ' Q' + (L.x + 12) + ' ' + (L.y + 70) + ' ' + (L.x - 8) + ' ' + (L.y + 40) + ' Z" fill="#8ec9f0" stroke="#5aa5d8" stroke-width="3"/>';
+        s += curve("M" + (MX - 38) + " " + (MY + 20) + " Q" + MX + " " + (MY - 16) + " " + (MX + 38) + " " + (MY + 20), 8);
+      }
+      return s;
+    }
+
+    function miniFace(emo) {
+      // 選項按鈕：只放臉部區域
+      return '<svg viewBox="40 120 300 260"><rect x="40" y="120" width="300" height="260" rx="60" fill="' + BODY + '"/>' + features(emo) + '</svg>';
+    }
+
+    // ---- 聲音 ----
+    let audioCtx = null;
+    function tone(freq, start, dur, type) {
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const o = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        o.type = type || "sine";
+        o.frequency.value = freq;
+        g.gain.setValueAtTime(0.0001, audioCtx.currentTime + start);
+        g.gain.exponentialRampToValueAtTime(0.25, audioCtx.currentTime + start + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + start + dur);
+        o.connect(g); g.connect(audioCtx.destination);
+        o.start(audioCtx.currentTime + start);
+        o.stop(audioCtx.currentTime + start + dur + 0.05);
+      } catch (e) {}
+    }
+    function playGood() { [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.12, 0.25, "triangle")); }
+    function playBad() { tone(220, 0, 0.18, "sine"); tone(196, 0.16, 0.25, "sine"); }
+    function playWin() { [523, 659, 784, 659, 784, 1047, 1319].forEach((f, i) => tone(f, i * 0.14, 0.3, "triangle")); }
+
+    function say(text) {
+      try {
+        if (!window.speechSynthesis) return;
+        speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = "en-US"; u.rate = 0.8; u.pitch = 1.1;
+        speechSynthesis.speak(u);
+      } catch (e) {}
+    }
+
+    // ---- 遊戲流程 ----
+    const faceEl = document.getElementById("face");
+    const wordEl = document.getElementById("word");
+    const hintEl = document.getElementById("hint");
+    const choicesEl = document.getElementById("choices");
+    const starsEl = document.getElementById("stars");
+    const overlay = document.getElementById("overlay");
+    let order = [], idx = 0, stars = 0, locked = false, mistakes = 0;
+
+    function shuffle(a) {
+      a = a.slice();
+      for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+      return a;
+    }
+
+    function startGame() {
+      order = shuffle(EMOS);
+      idx = 0; stars = 0; mistakes = 0;
+      starsEl.innerText = "";
+      overlay.style.display = "none";
+      nextRound();
+    }
+
+    function nextRound() {
+      locked = false; mistakes = 0;
+      const target = order[idx];
+      faceEl.innerHTML = "";
+      wordEl.innerText = target;
+      hintEl.innerText = "";
+      const others = shuffle(EMOS.filter(e => e !== target)).slice(0, 2);
+      const opts = shuffle([target].concat(others));
+      choicesEl.innerHTML = "";
+      opts.forEach(emo => {
+        const b = document.createElement("div");
+        b.className = "choice";
+        b.innerHTML = miniFace(emo);
+        b.onclick = () => pick(emo, b);
+        choicesEl.appendChild(b);
+      });
+      say(target);
+    }
+
+    function pick(emo, el) {
+      if (locked) return;
+      const target = order[idx];
+      if (emo === target) {
+        locked = true;
+        el.classList.add("good");
+        faceEl.innerHTML = features(emo);
+        hintEl.innerText = "答對了！" + target + " = " + HINT[target];
+        playGood();
+        if (mistakes === 0) stars++;
+        starsEl.innerText = "⭐".repeat(stars);
+        say("Great! " + target);
+        setTimeout(() => {
+          idx++;
+          if (idx >= order.length) finish(); else nextRound();
+        }, 1800);
+      } else {
+        mistakes++;
+        el.classList.add("shake");
+        setTimeout(() => el.classList.remove("shake"), 450);
+        hintEl.innerText = "再試一次！";
+        playBad();
+      }
+    }
+
+    function finish() {
+      document.getElementById("ovTitle").innerText = "太棒了！Well done!";
+      document.getElementById("ovText").innerHTML = "你拿到 " + stars + " 顆星星<br>（一次就答對才有星星）";
+      document.getElementById("bigstars").innerText = "⭐".repeat(stars) || "🌟";
+      document.getElementById("startBtn").innerText = "再玩一次 Play again";
+      overlay.style.display = "flex";
+      playWin();
+    }
+
+    document.getElementById("startBtn").onclick = startGame;
+    document.getElementById("sayBtn").onclick = () => { if (order[idx]) say(order[idx]); };
+  </script>
+</body>
+</html>
