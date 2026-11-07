@@ -20,6 +20,7 @@
     .st { font-size: 1.5rem; flex: none; }
     a.lv.c1 { background: #d9739a; } a.lv.c2 { background: #f5b82e; } a.lv.c3 { background: #5b9be0; }
     a.lv.c4 { background: #4caf62; } a.lv.c5 { background: #f28c28; }
+    a.lv.c6 { background: #9b6bd3; } a.lv.c7 { background: #e0463c; }
     a.lv.locked { background: #cfc4bb; box-shadow: none; }
     a.lv.locked .num { color: #a89b91; }
     a.lv.shake { animation: shake .4s; }
@@ -42,7 +43,9 @@
       { n: "認識顏色 Colors",       d: "點 6 個顏色，認識心情",       href: "colors.html?mode=free" },
       { n: "顏色配對 Match",        d: "聽心情，選對顏色",             href: "colors.html?mode=match" },
       { n: "跟著唱 Sing Along",     d: "記住顏色的順序",               href: "colors.html?mode=song" },
-      { n: "我來作曲 Compose",      d: "排顏色，讓碰碰唱你的歌",       href: "colors.html?mode=compose" }
+      { n: "我來作曲 Compose",      d: "排顏色，讓碰碰唱你的歌",       href: "colors.html?mode=compose" },
+      { n: "彩虹拼貼 Rainbow",      d: "聽單字，用紙片拼出彩虹",       href: "rainbow.html?mode=collage" },
+      { n: "彩虹畫畫 Paint",        d: "用手指畫一條彩虹",             href: "rainbow.html?mode=draw" }
     ];
     function getLevel() { try { return parseInt(localStorage.getItem("pp_level") || "0", 10) || 0; } catch (e) { return 0; } }
     function setLevel(n) { try { localStorage.setItem("pp_level", String(n)); } catch (e) {} }
