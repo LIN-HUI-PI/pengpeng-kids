@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>碰碰的彩虹 Rainbow</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+    body { background: #fffaf0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #4a3426; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 12px 12px 24px; }
+    h1 { font-size: 1.15rem; color: #c4527a; margin-bottom: 6px; }
+    #stageWrap { position: relative; width: 100%; max-width: 400px; aspect-ratio: 400 / 260; background: #fff; border-radius: 20px; box-shadow: 0 3px 10px rgba(0,0,0,.15); overflow: hidden; }
+    #sky { position: absolute; inset: 0; width: 100%; height: 100%; }
+    #cv { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: none; }
+    #pengWrap { position: absolute; right: 8px; top: 8px; width: 58px; pointer-events: none; }
+    #pengWrap img { width: 100%; display: block; mix-blend-mode: multiply; }
+    #pface { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .guide { fill: none; stroke: #efe6da; stroke-width: 26; }
+    .guide.tgt { stroke: #e7b8c9; stroke-dasharray: 10 8; animation: dash 1s linear infinite; }
+    @keyframes dash { to { stroke-dashoffset: -36; } }
+    .pc { transform-box: fill-box; transform-origin: center; animation: pop .35s both; }
+    @keyframes pop { 0% { transform: scale(0) rotate(-40deg); } 70% { transform: scale(1.25) rotate(8deg); } 100% { transform: scale(1) rotate(0); } }
+    #word { font-size: 2.2rem; font-weight: 800; letter-spacing: 2px; margin: 8px 0 0; min-height: 3rem; text-align: center; }
+    #hint { font-size: 0.95rem; color: #8a6f5a; min-height: 1.4rem; margin-bottom: 8px; text-align: center; }
+    #palette { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; width: 100%; max-width: 380px; }
+    .sw { width: 52px; height: 52px; border-radius: 50%; border: 4px solid #fff; box-shadow: 0 3px 8px rgba(0,0,0,.25); cursor: pointer; transition: transform .1s; position: relative; }
+    .sw:active { transform: scale(0.9); }
+    .sw.sel { box-shadow: 0 0 0 5px #d9739a, 0 3px 8px rgba(0,0,0,.25); transform: scale(1.12); }
+    .sw.lit { box-shadow: 0 0 0 6px rgba(255,255,255,.9), 0 0 18px 8px rgba(255,200,80,.95); transform: scale(1.15); }
+    .sw small { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); font-size: .7rem; color: #8a6f5a; margin-top: 3px; white-space: nowrap; }
+    .shake { animation: shake .4s; }
+    @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+    .btn { margin-top: 12px; background: #d9739a; color: #fff; border: none; font-weight: bold; font-size: 1rem; padding: 10px 20px; border-radius: 28px; cursor: pointer; text-decoration: none; display: inline-block; }
+    .btn.sub { background: #fff; color: #c4527a; border: 3px solid #d9739a; }
+    .btn.on { background: #d9739a; color: #fff; }
+    #bar { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+    #palette.draw { margin-bottom: 16px; }
+    #overlay { position: fixed; inset: 0; background: rgba(255,250,240,0.98); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; z-index: 10; }
+    #overlay h2 { font-size: 1.5rem; color: #c4527a; margin-bottom: 6px; }
+    #overlay p { font-size: 1rem; line-height: 1.6; margin-bottom: 8px; }
+    #overlay img { max-width: 280px; width: 80%; border-radius: 16px; box-shadow: 0 3px 10px rgba(0,0,0,.2); margin: 6px 0 10px; }
+    #overlay .btn { min-width: 220px; }
+  </style>
+</head>
+<body>
+  <h1>碰碰的彩虹 Rainbow</h1>
+
+  <div id="stageWrap">
+    <svg id="sky" viewBox="0 0 400 260"></svg>
+    <canvas id="cv" width="800" height="520"></canvas>
+    <div id="pengWrap">
+      <img src="pengpeng.png" alt="">
+      <svg id="pface" viewBox="0 0 420 464"></svg>
+    </div>
+  </div>
+
+  <div id="word"></div>
+  <div id="hint"></div>
+  <div id="palette"></div>
+  <div id="bar">
+    <button class="btn sub" id="sayBtn">🔊 再聽一次</button>
+    <button class="btn sub" id="eraserBtn">🧽 橡皮擦</button>
+    <button class="btn sub" id="clearBtn">🗑 重畫</button>
+    <button class="btn" id="doneBtn">✔ 畫好了</button>
+    <a class="btn sub" href="index.html">🏠 地圖</a>
+  </div>
+
+  <div id="overlay">
+    <h2 id="ovTitle"></h2>
+    <img id="ovImg" alt="" style="display:none">
+    <p id="ovText"></p>
+    <button class="btn" id="ovBtn"></button>
+    <a class="btn sub" href="index.html">🏠 回關卡地圖</a>
+  </div>
+
+  <script>
+    // 彩虹順序：外圈紅 → 內圈紫；音符是五聲音階，彩虹就是一段旋律
+    const RB = [
+      { n: "Red",    hex: "#e0463c", zh: "紅色", f: 261.6 },
+      { n: "Orange", hex: "#f28c28", zh: "橘色", f: 293.7 },
+      { n: "Yellow", hex: "#f5d33f", zh: "黃色", f: 329.6 },
+      { n: "Green",  hex: "#4caf62", zh: "綠色", f: 392.0 },
+      { n: "Blue",   hex: "#5b9be0", zh: "藍色", f: 440.0 },
+      { n: "Purple", hex: "#9b6bd3", zh: "紫色", f: 523.3 }
+    ];
+    const CX = 200, CY = 240;
+    const BANDS = RB.map((c, i) => Object.assign({ r: 176 - 26 * i }, c));
+
+    // ---- 進度 ----
+    function savePass(n) {
+      try { const c = parseInt(localStorage.getItem("pp_level") || "0", 10); if (n === c + 1) localStorage.setItem("pp_level", String(n)); } catch (e) {}
+    }
+
+    // ---- 聲音 ----
+    let audioCtx = null;
+    function tone(freq, start, dur, type, vol) {
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = type || "triangle"; o.frequency.value = freq;
+        const t0 = audioCtx.currentTime + (start || 0);
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.exponentialRampToValueAtTime(vol || 0.28, t0 + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+        o.connect(g); g.connect(audioCtx.destination);
+        o.start(t0); o.stop(t0 + dur + 0.05);
+      } catch (e) {}
+    }
+    function playBad() { tone(220, 0, 0.18, "sine"); tone(196, 0.16, 0.25, "sine"); }
+    function playWin() { RB.slice().reverse().concat(RB).forEach((c, i) => tone(c.f, i * 0.12, 0.3)); }
+    function say(text) {
+      try {
+        if (!window.speechSynthesis) return;
+        speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = "en-US"; u.rate = 0.8; u.pitch = 1.1;
+        speechSynthesis.speak(u);
+      } catch (e) {}
+    }
+
+    // ---- 碰碰的臉 ----
+    const INK = "#0b0b06", EYE = "#fffff0";
+    const L = { x: 114, y: 188 }, R = { x: 267, y: 177 }, MX = 202, MY = 328;
+    function eye(c) {
+      return '<circle cx="' + c.x + '" cy="' + c.y + '" r="31" fill="' + EYE + '" stroke="' + INK + '" stroke-width="7"/><circle cx="' + c.x + '" cy="' + c.y + '" r="8" fill="' + INK + '"/>';
+    }
+    function curve(d, w) { return '<path d="' + d + '" stroke="' + INK + '" stroke-width="' + w + '" stroke-linecap="round" fill="none"/>'; }
+    function face(happy) {
+      let s = "";
+      if (happy) {
+        s += curve("M" + (L.x - 28) + " " + (L.y + 8) + " Q" + L.x + " " + (L.y - 30) + " " + (L.x + 28) + " " + (L.y + 8), 8);
+        s += curve("M" + (R.x - 28) + " " + (R.y + 8) + " Q" + R.x + " " + (R.y - 30) + " " + (R.x + 28) + " " + (R.y + 8), 8);
+        s += curve("M" + (MX - 48) + " " + (MY - 12) + " Q" + MX + " " + (MY + 52) + " " + (MX + 48) + " " + (MY - 12), 8);
+      } else {
+        s += eye(L) + eye(R) + curve("M" + (MX - 28) + " " + MY + " L" + (MX + 28) + " " + MY, 7);
+      }
+      document.getElementById("pface").innerHTML = s;
+    }
+
+    // ---- 彩虹畫布（SVG 底圖 + 拼貼紙片）----
+    const sky = document.getElementById("sky");
+    function arcPath(r) { return "M" + (CX - r) + " " + CY + " A" + r + " " + r + " 0 0 1 " + (CX + r) + " " + CY; }
+    function buildSky() {
+      let s = "";
+      BANDS.forEach((b, i) => { s += '<path class="guide" id="g' + i + '" d="' + arcPath(b.r) + '"/>'; });
+      s += '<g id="pieces"></g>';
+      sky.innerHTML = s;
+    }
+    function shade(hex, f) {
+      const n = parseInt(hex.slice(1), 16);
+      const c = v => Math.max(0, Math.min(255, Math.round(v * f)));
+      return "rgb(" + c(n >> 16) + "," + c((n >> 8) & 255) + "," + c(n & 255) + ")";
+    }
+    function blob(x, y, rad, hex) {
+      const k = 7, pts = [], pts2 = [];
+      for (let i = 0; i < k; i++) {
+        const a = (Math.PI * 2 * i) / k + (Math.random() - 0.5) * 0.5;
+        const rr = rad * (0.65 + Math.random() * 0.5);
+        pts.push((x + rr * Math.cos(a)).toFixed(1) + "," + (y + rr * Math.sin(a)).toFixed(1));
+        pts2.push((x - 2 + rr * 0.5 * Math.cos(a)).toFixed(1) + "," + (y - 2 + rr * 0.5 * Math.sin(a)).toFixed(1));
+      }
+      return '<polygon points="' + pts.join(" ") + '" fill="' + shade(hex, 0.85 + Math.random() * 0.3) + '" stroke="rgba(0,0,0,.15)" stroke-width="0.8"/>' +
+             '<polygon points="' + pts2.join(" ") + '" fill="' + shade(hex, 1.2) + '" opacity=".55"/>';
+    }
+    function placeBand(i) {
+      const b = BANDS[i];
+      const n = Math.round(Math.PI * b.r / 21);
+      const g = document.getElementById("pieces");
+      let html = "";
+      for (let k = 0; k < n; k++) {
+        const th = Math.PI + Math.PI * (k + 0.5) / n;
+        const x = CX + b.r * Math.cos(th) + (Math.random() - 0.5) * 4;
+        const y = CY + b.r * Math.sin(th) + (Math.random() - 0.5) * 4;
+        html += '<g class="pc" style="animation-delay:' + (k * 22) + 'ms">' + blob(x, y, 13 + Math.random() * 3, b.hex) + '</g>';
+      }
+      g.insertAdjacentHTML("beforeend", html);
+      tone(b.f, 0, 0.6);
+    }
+
+    // ---- 共用元件 ----
+    const wordEl = document.getElementById("word");
+    const hintEl = document.getElementById("hint");
+    const palEl = document.getElementById("palette");
+    const overlay = document.getElementById("overlay");
+    const cv = document.getElementById("cv");
+    const ctx = cv.getContext("2d");
+    let mode = "collage", locked = false, ci = 0, wrong = 0;
+    let cur = 0, erasing = false, strokes = 0, used = {};
+
+    function drawPalette(withNames) {
+      palEl.innerHTML = "";
+      palEl.className = withNames ? "draw" : "";
+      RB.forEach((c, i) => {
+        const d = document.createElement("div");
+        d.className = "sw"; d.dataset.i = i; d.style.background = c.hex;
+        if (withNames) d.innerHTML = "<small>" + c.n + "</small>";
+        d.onclick = () => (mode === "collage" ? pickCollage(i, d) : pickColor(i));
+        palEl.appendChild(d);
+      });
+    }
+    function setBar(m) {
+      document.getElementById("sayBtn").style.display = m === "collage" ? "" : "none";
+      ["eraserBtn", "clearBtn", "doneBtn"].forEach(id => document.getElementById(id).style.display = m === "draw" ? "" : "none");
+    }
+    function showOverlay(title, text, imgSrc, btnText, onBtn) {
+      document.getElementById("ovTitle").innerText = title;
+      document.getElementById("ovText").innerHTML = text;
+      const im = document.getElementById("ovImg");
+      if (imgSrc) { im.src = imgSrc; im.style.display = ""; } else im.style.display = "none";
+      const b = document.getElementById("ovBtn");
+      b.innerText = btnText; b.onclick = () => { overlay.style.display = "none"; onBtn(); };
+      overlay.style.display = "flex";
+    }
+
+    // ---- 玩法一：拼貼彩虹 ----
+    function startCollage() {
+      mode = "collage"; ci = 0; locked = false;
+      cv.style.display = "none"; setBar("collage");
+      buildSky(); face(false); drawPalette(false);
+      nextPrompt();
+    }
+    function nextPrompt() {
+      locked = false; wrong = 0;
+      const t = BANDS[ci];
+      document.querySelectorAll(".guide").forEach(g => g.classList.remove("tgt"));
+      document.getElementById("g" + ci).classList.add("tgt");
+      wordEl.innerText = t.n;
+      hintEl.innerText = "找到這個顏色，把紙片貼到彩虹上";
+      say(t.n);
+    }
+    function pickCollage(i, el) {
+      if (locked) return;
+      if (i === ci) {
+        locked = true;
+        document.getElementById("g" + ci).classList.remove("tgt");
+        placeBand(ci);
+        hintEl.innerText = BANDS[ci].n + " = " + BANDS[ci].zh;
+        say(BANDS[ci].n + "! Great!");
+        face(true);
+        setTimeout(() => {
+          face(false);
+          ci++;
+          if (ci >= BANDS.length) finishCollage(); else nextPrompt();
+        }, 1700);
+      } else {
+        wrong++;
+        el.classList.add("shake");
+        setTimeout(() => el.classList.remove("shake"), 450);
+        hintEl.innerText = "再試一次！";
+        playBad();
+        if (wrong >= 2) {
+          const ok = palEl.querySelector('[data-i="' + ci + '"]');
+          ok.classList.add("lit"); setTimeout(() => ok.classList.remove("lit"), 1500);
+        }
+      }
+    }
+    function finishCollage() {
+      savePass(6);
+      face(true); playWin(); say("Rainbow! Well done!");
+      wordEl.innerText = "Rainbow!";
+      hintEl.innerText = "彩虹拼好了！";
+      setTimeout(() => showOverlay("拼好彩虹了！Rainbow!", "真的彩虹也是這樣一圈一圈的喔！", "rainbow_sky.jpg", "再玩一次", startCollage), 1800);
+    }
+
+    // ---- 玩法二：畫彩虹 ----
+    function startDraw() {
+      mode = "draw"; cur = 0; erasing = false; strokes = 0; used = {};
+      cv.style.display = "block"; setBar("draw");
+      buildSky(); face(false); drawPalette(true);
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      selectColor(0, false);
+      wordEl.innerText = "Paint!";
+      hintEl.innerText = "選顏色，用手指畫彩虹（至少用 3 種顏色）";
+    }
+    function selectColor(i, speak) {
+      cur = i; erasing = false;
+      document.getElementById("eraserBtn").classList.remove("on");
+      palEl.querySelectorAll(".sw").forEach(s => s.classList.toggle("sel", +s.dataset.i === i));
+      if (speak) { tone(RB[i].f, 0, 0.4); say(RB[i].n); wordEl.innerText = RB[i].n; }
+    }
+    function pickColor(i) { selectColor(i, true); }
+
+    let drawing = false, lastX = 0, lastY = 0;
+    function pos(e) {
+      const r = cv.getBoundingClientRect();
+      return { x: (e.clientX - r.left) * cv.width / r.width, y: (e.clientY - r.top) * cv.height / r.height };
+    }
+    function strokeTo(x, y) {
+      ctx.globalCompositeOperation = erasing ? "destination-out" : "source-over";
+      ctx.strokeStyle = erasing ? "#000" : RB[cur].hex;
+      ctx.lineWidth = erasing ? 40 : 26;
+      ctx.lineCap = "round"; ctx.lineJoin = "round";
+      ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(x, y); ctx.stroke();
+      lastX = x; lastY = y;
+    }
+    cv.addEventListener("pointerdown", e => {
+      if (mode !== "draw") return;
+      e.preventDefault(); drawing = true;
+      try { cv.setPointerCapture(e.pointerId); } catch (err) {}
+      const p = pos(e); lastX = p.x; lastY = p.y; strokeTo(p.x + 0.1, p.y + 0.1);
+      if (!erasing) { strokes++; used[cur] = true; }
+    });
+    cv.addEventListener("pointermove", e => { if (!drawing) return; e.preventDefault(); const p = pos(e); strokeTo(p.x, p.y); });
+    ["pointerup", "pointercancel"].forEach(t => cv.addEventListener(t, () => { drawing = false; }));
+
+    document.getElementById("eraserBtn").onclick = () => {
+      erasing = !erasing;
+      document.getElementById("eraserBtn").classList.toggle("on", erasing);
+      palEl.querySelectorAll(".sw").forEach(s => s.classList.toggle("sel", !erasing && +s.dataset.i === cur));
+    };
+    document.getElementById("clearBtn").onclick = () => {
+      ctx.clearRect(0, 0, cv.width, cv.height); strokes = 0; used = {};
+      hintEl.innerText = "重新來，用手指畫彩虹！";
+    };
+    document.getElementById("doneBtn").onclick = () => {
+      const colors = Object.keys(used).length;
+      if (strokes < 4 || colors < 3) { playBad(); hintEl.innerText = "再多畫一點，至少用 3 種顏色喔！（現在 " + colors + " 種）"; return; }
+      savePass(7); face(true); playWin(); say("Nice painting!");
+      showOverlay("畫得真漂亮！Nice painting!", "你用了 " + colors + " 種顏色，<br>碰碰好喜歡！", null, "再畫一張", startDraw);
+    };
+    document.getElementById("sayBtn").onclick = () => { if (mode === "collage" && ci < BANDS.length) say(BANDS[ci].n); };
+
+    // ---- 開始 ----
+    (function () {
+      const m = new URLSearchParams(location.search).get("mode");
+      if (m === "draw") {
+        buildSky(); face(false); setBar("draw"); drawPalette(true); cv.style.display = "block";
+        showOverlay("畫彩虹 Paint a Rainbow", "選顏色，用手指畫一條彩虹！<br>想畫什麼都可以。", null, "開始畫", startDraw);
+      } else {
+        buildSky(); face(false); setBar("collage"); drawPalette(false);
+        showOverlay("拼彩虹 Rainbow Collage", "像這樣，用紙片拼出彩虹！<br>聽單字，找顏色，貼上去。", "rainbow_collage.jpg", "開始拼", startCollage);
+      }
+    })();
+  </script>
+</body>
+</html>
