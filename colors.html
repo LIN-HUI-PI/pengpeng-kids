@@ -18,6 +18,9 @@
     .sw { aspect-ratio: 1; border-radius: 50%; border: 5px solid #fff; box-shadow: 0 3px 8px rgba(0,0,0,.25); cursor: pointer; transition: transform .1s; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.5); font-size: 1.05rem; }
     .sw:active { transform: scale(0.92); }
     .sw.lit { transform: scale(1.12); box-shadow: 0 0 0 6px rgba(255,255,255,.9), 0 0 18px 6px rgba(255,200,80,.9); }
+    .sw.bounce { animation: bounce .8s ease-in-out infinite; }
+    .sw.dim { opacity: .28; pointer-events: none; }
+    @keyframes bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
     .shake { animation: shake .4s; }
     .good { box-shadow: 0 0 0 6px #6cc070; }
     @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
@@ -55,7 +58,7 @@
   <div id="bar">
     <button class="btn sub" id="sayBtn">🔊 再聽一次</button>
     <button class="btn sub" id="menuBtn">☰ 選玩法</button>
-    <a class="btn sub" href="home.html" style="text-decoration:none">🏠 地圖</a>
+    <a class="btn sub" href="index.html" style="text-decoration:none">🏠 地圖</a>
   </div>
 
   <div id="overlay">
@@ -66,7 +69,7 @@
     <button class="btn" data-mode="match">👂 聽心情，選顏色</button>
     <button class="btn" data-mode="song">🎵 跟著唱</button>
     <button class="btn" data-mode="compose">🎼 我來作曲</button>
-    <a class="btn sub" href="home.html" style="text-decoration:none;display:inline-block;width:240px;text-align:center">🏠 回關卡地圖</a>
+    <a class="btn sub" href="index.html" style="text-decoration:none;display:inline-block;width:240px;text-align:center">🏠 回關卡地圖</a>
   </div>
 
   <script>
@@ -225,13 +228,13 @@
         const it = ITEMS[i];
         showPP(i, it.emo);
         tone(it.note, 0, 0.5);
-        wordEl.innerText = it.color + " · " + it.emo;
-        hintEl.innerText = it.zh;
+        wordEl.innerText = it.color + " = " + it.emo;
+        hintEl.innerText = it.zh + "（" + it.color + " 是 " + it.emo + "）";
         sayItem(i);
-        tapped[i] = true;
-        if (Object.keys(tapped).length >= 6) {
-          savePass(2);
-          hintEl.innerText = it.zh + "　🎉 6 個顏色都認識了，過關！";
+        if (tour) {
+          locked = true;
+          swEl.querySelectorAll(".sw").forEach(x => x.classList.remove("bounce"));
+          setTimeout(() => { tourIdx++; nextTour(); }, 2200);
         }
       } else if (mode === "match") {
         pickMatch(i, el);
@@ -243,12 +246,36 @@
     }
 
     // ---- 玩法一：自由玩 ----
+    let tour = false, tourIdx = 0;
     function startFree() {
-      mode = "free"; tapped = {};
+      mode = "free"; tapped = {}; tour = true; tourIdx = 0; locked = false;
       showPP(NEUTRAL, "Neutral");
-      wordEl.innerText = "點一個顏色！";
-      hintEl.innerText = "每個顏色都是一種心情，也是一個音符";
       drawSwatches([0, 1, 2, 3, 4, 5], true);
+      nextTour();
+    }
+    function nextTour() {
+      locked = false;
+      if (tourIdx >= ITEMS.length) {
+        tour = false;
+        swEl.querySelectorAll(".sw").forEach(x => { x.classList.remove("dim", "bounce"); });
+        savePass(2);
+        showPP(NEUTRAL, "Happy");
+        wordEl.innerText = "全部認識了！";
+        hintEl.innerText = "🎉 過關！現在自由玩，隨便點～";
+        playWin(); say("Great job!");
+        return;
+      }
+      const i = tourIdx, it = ITEMS[i];
+      showPP(NEUTRAL, "Neutral");
+      swEl.querySelectorAll(".sw").forEach(x => {
+        const me = +x.dataset.i === i;
+        x.classList.toggle("dim", !me);
+        x.classList.toggle("bounce", me);
+      });
+      wordEl.innerText = "點 " + it.color;
+      hintEl.innerText = "第 " + (i + 1) + " / 6　點會跳動的顏色，看碰碰變身！";
+      lastSay = it.color + ".";
+      say(it.color);
     }
 
     // ---- 玩法二：聽心情，選顏色 ----
@@ -279,10 +306,11 @@
         el.classList.add("good");
         showPP(t, it.emo);
         [0, 1, 2].forEach(k => tone(it.note * (k === 2 ? 2 : 1), k * 0.12, 0.3));
-        hintEl.innerText = "答對了！" + it.color + " = " + it.emo + "（" + it.zh + "）";
+        hintEl.innerText = "Pengpeng is " + it.color.toLowerCase() + " now!（碰碰現在是" + ({Yellow:"黃色",Blue:"藍色",Red:"紅色",Green:"綠色",Pink:"粉紅色",Orange:"橘色"})[it.color] + "）";
         if (mistakes === 0) stars++;
         starsEl.innerText = "⭐".repeat(stars);
-        say("Great! " + it.color + ". " + it.emo);
+        lastSay = "Pengpeng is " + it.color.toLowerCase() + " now!";
+        say(lastSay);
         setTimeout(() => { idx++; if (idx >= order.length) finish(); else matchRound(); }, 2000);
       } else {
         mistakes++;
@@ -290,6 +318,11 @@
         setTimeout(() => el.classList.remove("shake"), 450);
         hintEl.innerText = "再試一次！";
         playBad();
+        if (mistakes >= 2) {
+          const ok = swEl.querySelector('[data-i="' + t + '"]');
+          if (ok) { ok.classList.add("lit"); setTimeout(() => ok.classList.remove("lit"), 1600); }
+          hintEl.innerText = it.emo + " 是" + it.zh + "，看閃閃的那一個！";
+        }
       }
     }
 
